@@ -302,7 +302,52 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        bitstream: np.ndarray = ...
+        
+        #initialize bitstream as an array containing 0010. This part of the header indicates alphanumeric mode
+        bitstream = np.array([0,0,1,0])
+        
+        #convert the input data to a list
+        input = list(data)
+        
+        #convert each input character to the corresponding number specified for alphanumeric mode
+        convert_array = np.array(['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',' ','$','%','*','+','-','.','/',':'])
+        numbers = []
+        for i in input:
+            num = np.where(convert_array == i)[0][0]
+            numbers.append(num)
+           
+        #group the numbers in groups of two and construct number to be encoded
+        #convert each of the grouped numbers to a bit sequence of 11 bits.
+        #if the number of characters is odd, the last number gets represented with 6 bits
+        #first make i an array of strings containing the bits
+        grouped_numbers = []
+        p = 0
+        while p< len(numbers):
+            if(p<(len(numbers)-1)):
+                grouped_number = numbers[p]*45+numbers[p+1]
+                #convert to binary number of 11 bits
+                grouped_numbers.append('{0:011b}'.format(grouped_number))
+            else:
+                grouped_number = numbers[p]
+                #convert to binary number of 6 bits
+                grouped_numbers.append('{0:06b}'.format(grouped_number))
+            p+=2
+        data = []
+        for i in grouped_numbers:
+            for n in i:
+                data.append(int(n))
+        
+        #the number of characters needs to be converted to a 9 bit binary number
+        character_count_indicator = '{0:09b}'.format(len(input))
+        character_count = []
+        for i in character_count_indicator:
+            character_count.append(int(i))
+            
+        #add the character count indicator part of the header
+        bitstream = np.append(bitstream,np.array(character_count))
+        
+        #finally add the binary version of the grouped numbers to the bitstream
+        bitstream = np.append(bitstream,np.array(data))
         ################################################################################################################
 
         assert len(np.shape(bitstream)) == 1 and type(bitstream) is np.ndarray, "bitstream must be a 1D numpy array"
