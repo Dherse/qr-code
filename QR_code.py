@@ -364,7 +364,49 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        data: str = ...
+        # remove first 4 bits. They are indicating alphanumeric mode if they are 0010
+        assert bitstream[0] == 0 and bitstream[1] ==0 and bitstream[2] == 1 and bitstream[3] == 0, "input does not use alphanumeric mode"
+        # get character count indicator from the header
+        character_count_bits = bitstream[4:13]
+        character_count = 0
+        for i in range(0,9):
+            character_count+= character_count_bits[8-i]*2**i
+        # we now know how many characters are encoded in the bitstream
+        
+        # convert the bitstream to the grouped numbers
+        binary_data = bitstream[13:]
+        grouped_numbers = []
+        i = 0
+        while i<len(binary_data):
+            if(i+11 < len(binary_data)):
+                number = 0
+                for j in range(0,11):
+                    number+= binary_data[i+10-j] * 2**j
+                grouped_numbers.append(number)
+            else:
+                number = 0
+                for j in range(0,6):
+                    number+= binary_data[i+5-j] * 2**j
+                grouped_numbers.append(number)
+            i+=11
+        # the grouped number is a combination of two numbers like number1*45+number2
+        # extract these numbers back
+        split_numbers = []
+        for i in range(len(grouped_numbers)):
+            if(i==len(grouped_numbers)-1 and character_count%2 == 1):
+                split_numbers.append(grouped_numbers[i])
+            else:
+                split_numbers.append(grouped_numbers[i]//45)
+                split_numbers.append(grouped_numbers[i]%45)
+        
+        # now only conversion from numbers to strings is necessary
+        convert_array = np.array(['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',' ','$','%','*','+','-','.','/',':'])
+        
+        string_data = ""
+        for i in split_numbers:
+            string_data+= convert_array[i]
+        
+        data: str = string_data
         ################################################################################################################
 
         assert type(data) is str, "data must be a string"
