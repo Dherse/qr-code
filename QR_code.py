@@ -40,40 +40,54 @@ class QR_code:
         ################################################################################################################
         # insert your code here
         # add 0's to the bitstream to get a multiple of 8 
-        assert len(bitstream) < 608 , "The bitstream to be encoded is to long for this version"
-        #print(len(bitstream)%8)
+        border= 0
+        nr_blocks = 0
+        if(self.level == 'L'):
+            border = 1088
+            nr_blocks = 2
+        elif(self.level == 'M'):
+            border = 864
+            nr_blocks = 4
+        elif(self.level == 'Q'):
+            border = 608
+            nr_blocks = 4
+        elif(self.level == 'H'):
+            border = 480
+            nr_blocks = 4
+        if(len(bitstream)<border-1):
+            bitstream = np.append(bitstream,[0,0,0,0])
+        assert len(bitstream) < border , "The bitstream to be encoded is to long for this version"
         if(len(bitstream)%8 != 0):
             bitstream = np.append(bitstream,[0 for i in range(8-len(bitstream)%8)])
-        # fill in the bitstream to get the 608 = 76*8 data bits for version6 and correction level Q
-        codewords_to_append = 76-len(bitstream)//8
+        # fill in the bitstream to get the border = border/8*8 data bits for version6 and the requested correction level
+        codewords_to_append = border//8-len(bitstream)//8
         codeword_1 = [1,1,1,0,1,1,0,0]
         codeword_2 = [0,0,0,1,0,0,0,1]
         i = True
-        # print(bitstream)
         for j in range(codewords_to_append):
             if i:
                 bitstream = np.append(bitstream, codeword_1)
             else:
                 bitstream = np.append(bitstream, codeword_2)
             i = not i
-        # print(len(bitstream))
         GF = galois.GF(2**8, repr = "int")
         encoded_data = []
-        for j in range(4):
-            block = bitstream[j*152:(j+1)*152]
+        
+        for j in range(nr_blocks):
+            block = bitstream[j*border//nr_blocks:(j+1)*border//nr_blocks]
             # convert the elements of the block to elements of the GF(2**8)
             # this results in informationwords of length 19 elements of GF(256) which are reed solomon encoded until 43 elements
             # of GF(256)
             informationword = []
-            for p in range(152//8):
+            for p in range(border//nr_blocks//8):
                 number = block[8*p]*2**7+block[8*p+1]*2**6+block[8*p+2]*2**5+block[8*p+3]*2**4+block[8*p+4]*2**3+block[8*p+5]*2**2+block[8*p+6]*2+block[8*p+7]
                 informationword.append(number)
             informationword = GF(informationword)
-            encoded_data.append(self.encodeRS(informationword,2,8,43,19,self.generator))
+            encoded_data.append(self.encodeRS(informationword,2,8,172//nr_blocks,border//nr_blocks//8,self.generator))
         # interlace the elements of GF(256) and convert the elements to their bit representation -> message
         numbers = []
-        for k in range(43):
-            for l in range(4):
+        for k in range(172//nr_blocks):
+            for l in range(nr_blocks):
                 num = encoded_data[l][k]
                 numbers.append(num)
         data_enc = []
@@ -81,7 +95,6 @@ class QR_code:
             number = '{0:08b}'.format(j)
             for h in number:
                 data_enc.append(int(h))
-        print(data_enc)
         data_enc = np.array(data_enc)
         #data_enc: np.ndarray = ...
         ################################################################################################################
@@ -359,7 +372,7 @@ class QR_code:
         for i in input:
             num = np.where(convert_array == i)[0][0]
             numbers.append(num)
-           
+            
         #group the numbers in groups of two and construct number to be encoded
         #convert each of the grouped numbers to a bit sequence of 11 bits.
         #if the number of characters is odd, the last number gets represented with 6 bits
@@ -396,6 +409,7 @@ class QR_code:
 
         assert len(np.shape(bitstream)) == 1 and type(bitstream) is np.ndarray, "bitstream must be a 1D numpy array"
         return bitstream
+        
 
     @staticmethod
     def read_dataStream(bitstream: np.ndarray) -> str:
@@ -573,6 +587,16 @@ class QR_code:
         #with gf.repr("power"):
         #    print(codeword_polynomial)
         #    print(codeword_polynomial.coeffs)
+        
+        # highest term of polynomial are left out if their coefficient is 0 
+        # -> they disappear from the codeword and codeword hasn't right length -> add them at the front
+        to_add = n-len(codeword)
+        if(to_add != 0):
+            print([int(0) for i in range(to_add)])
+            codeword = np.append([int(0) for i in range(to_add)],codeword)
+        GF.repr("int")
+        print(codeword)
+        
         codeword: galois.FieldArray = codeword
         ################################################################################################################
 
