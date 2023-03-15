@@ -39,7 +39,51 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        data_enc: np.ndarray = ...
+        # add 0's to the bitstream to get a multiple of 8 
+        assert len(bitstream) < 608 , "The bitstream to be encoded is to long for this version"
+        #print(len(bitstream)%8)
+        if(len(bitstream)%8 != 0):
+            bitstream = np.append(bitstream,[0 for i in range(8-len(bitstream)%8)])
+        # fill in the bitstream to get the 608 = 76*8 data bits for version6 and correction level Q
+        codewords_to_append = 76-len(bitstream)//8
+        codeword_1 = [1,1,1,0,1,1,0,0]
+        codeword_2 = [0,0,0,1,0,0,0,1]
+        i = True
+        # print(bitstream)
+        for j in range(codewords_to_append):
+            if i:
+                bitstream = np.append(bitstream, codeword_1)
+            else:
+                bitstream = np.append(bitstream, codeword_2)
+            i = not i
+        # print(len(bitstream))
+        GF = galois.GF(2**8, repr = "int")
+        encoded_data = []
+        for j in range(4):
+            block = bitstream[j*152:(j+1)*152]
+            # convert the elements of the block to elements of the GF(2**8)
+            # this results in informationwords of length 19 elements of GF(256) which are reed solomon encoded until 43 elements
+            # of GF(256)
+            informationword = []
+            for p in range(152//8):
+                number = block[8*p]*2**7+block[8*p+1]*2**6+block[8*p+2]*2**5+block[8*p+3]*2**4+block[8*p+4]*2**3+block[8*p+5]*2**2+block[8*p+6]*2+block[8*p+7]
+                informationword.append(number)
+            informationword = GF(informationword)
+            encoded_data.append(self.encodeRS(informationword,2,8,43,19,self.generator))
+        # interlace the elements of GF(256) and convert the elements to their bit representation -> message
+        numbers = []
+        for k in range(43):
+            for l in range(4):
+                num = encoded_data[l][k]
+                numbers.append(num)
+        data_enc = []
+        for j in numbers:
+            number = '{0:08b}'.format(j)
+            for h in number:
+                data_enc.append(int(h))
+        print(data_enc)
+        data_enc = np.array(data_enc)
+        #data_enc: np.ndarray = ...
         ################################################################################################################
 
         assert len(np.shape(data_enc)) == 1 and type(data_enc) is np.ndarray, "data_enc must be a 1D numpy array"
@@ -463,7 +507,23 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        generator: galois.Poly = ...
+        # in our case error correction level Q so p = 2, m = 8 and t = 12
+        gf = galois.GF(p**m)
+        n = p**m-1
+        m0 = 0
+        primitive_poly = gf.irreducible_poly
+        alpha = gf.primitive_element
+        #create generator polynomial
+        #first make a list containing all roots of this generator polynomial
+        roots = []
+        for i in range(2*t):
+            roots.append((alpha**i))
+        a = gf(roots)
+        pol = galois.Poly.Roots(a)
+        
+        #with gf.repr("power"):
+        #    print(pol)
+        generator: galois.Poly = pol
         ################################################################################################################
 
         assert type(generator) == type(galois.Poly([0], field=galois.GF(m))), "generator must be a galois.Poly object"
@@ -488,7 +548,32 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        codeword: galois.FieldArray = ...
+        # method for generationg systematic cyclic codes
+        # make a polynomial b of the informationword
+        b = galois.Poly(informationword)
+        # multiply b with x**(n-k)
+        # first create the polynomial x**(n-k)
+        a = [1]
+        c = [0 for i in range(n-k)]
+        a+=c
+        p = galois.Poly(a,field=GF)
+        # then multiply b with x**(n-k) to get the result
+        result = p*b
+        #with gf.repr("power"):
+        #    print(p)
+        #    print(b)
+        #    print(result)
+        # divide result by the generator matrix and obtain remainder r(x)
+        r = result%generator
+        #with gf.repr("power"):
+        #    print(r)
+        # subtract r(x) from result to get the codeword
+        codeword_polynomial = result-r
+        codeword = codeword_polynomial.coeffs
+        #with gf.repr("power"):
+        #    print(codeword_polynomial)
+        #    print(codeword_polynomial.coeffs)
+        codeword: galois.FieldArray = codeword
         ################################################################################################################
 
         assert type(codeword) is GF and len(np.shape(codeword)) == 1, "each element of codeword(1D)  must be a galois.GF element"
@@ -614,3 +699,8 @@ class QR_code:
                     A_new[x:x+nR, y:y+nC] = np.reshape(np.arange(2+x*nR+y, 2+nR*nC+x*nR+y), (nR, nC))
 
         return A_new, num
+
+a = QR_code.generate_dataStream("TEST GROUP 21")
+print(a)
+b = QR_code.read_dataStream(a)
+print(b)
