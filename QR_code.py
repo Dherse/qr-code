@@ -603,7 +603,7 @@ class QR_code:
         return codeword
 
     @staticmethod
-    def decodeRS(codeword: galois.FieldArray, p: int, m: int, n: int, k: int, generator: galois.Poly) -> galois.FieldArray:
+    def decodeRS(codeword: galois.FieldArray, p: int, m: int, n: int, k: int, generator: galois.Poly, m0: int = 0) -> galois.FieldArray:
         # Decode the codeword
         # INPUT:
         #  -codeword: a 1D array of galois.GF elements that represents the codeword coefficients in GF(p^m) corresponding to systematic Reed-Solomon coding of the corresponding information word (first element is the highest degree coefficient)
@@ -622,7 +622,6 @@ class QR_code:
         ################################################################################################################
         # insert your code here
         n = p**m - 1
-        m0: int = 1
         a:  galois.Poly = GF.primitive_element
         t:  int = generator.degree//2
         r:  galois.Poly = galois.Poly(codeword, field=GF)
@@ -671,14 +670,12 @@ class QR_code:
         v: int = Lambda.degree
         E: np.ndarray = np.array([GF(0) for _ in range(n)], dtype=galois.Poly)
         coeffs = Lambda.coefficients(order="asc")
-        for j in range(m0+n-1):
-            if j < m0:
-                E[j] = r(a**j)
-            elif j < m0+2*t:
+        for j in range(m0, m0+n):
+            if m0 <= j and j < m0+2*t:
                 E[j] = S[j-m0]
             else:
                 for i in range(1, v+1):
-                    E[j] += -coeffs[i] * E[j-i]
+                    E[j % n] += -coeffs[i] * E[(j-i) % n]
 
         # NOTE: convert error vector to time domain
         e: np.ndarray = np.array([GF(0) for _ in range(n)], dtype=galois.Poly)

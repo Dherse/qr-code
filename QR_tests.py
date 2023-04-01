@@ -30,7 +30,7 @@ def test_decodeRS_from_example_bma():
     print(f"p(x) = {prim_poly}")
     print(f"g(x) = {g}")
     print(f"r(x) = {r}")
-    print(f">>> c(x) = {galois.Poly(QR_code.decodeRS(r.coeffs, p, m, n, n-2*t-1, g))}\n    (expecting c(x) = 0)")
+    print(f">>> c(x) = {galois.Poly(QR_code.decodeRS(r.coeffs, p, m, n, n-2*t-1, g, 1))}\n    (expecting c(x) = 0)")
     print()
 
 
@@ -48,7 +48,7 @@ def test_decodeRS_from_exercies_11():
     print(f"p(x) = {prim_poly}")
     print(f"g(x) = {g}")
     print(f"r(x) = {r}")
-    print(f">>> c(x) = {galois.Poly(QR_code.decodeRS(r.coeffs, p, m, n, k, g))}\n    (expecting c(x) = 0)")
+    print(f">>> c(x) = {galois.Poly(QR_code.decodeRS(r.coeffs, p, m, n, k, g, 1))}\n    (expecting c(x) = 0)")
     print()
 
 
@@ -66,7 +66,7 @@ def test_decodeRS_for_assignment():
     for i in range(10):
         r:          galois.Poly = galois.Poly([j < i for j in range(10)], field=GF, order="asc")
         print(f" - r(x) = {r}")
-        print(f"   >>> c(x) = {galois.Poly(QR_code.decodeRS(r.coeffs, p, m, None, None, g))}\n       (expecting c(x) {'!'*(7<i)}= 0)")
+        print(f"   >>> c(x) = {galois.Poly(QR_code.decodeRS(r.coeffs, p, m, None, None, g, 1))}\n       (expecting c(x) {'!'*(7<i)}= 0)")
 
 
 if __name__ == "__main__":
