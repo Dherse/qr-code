@@ -634,9 +634,7 @@ class QR_code:
             Forney's algorithm                  : no need to convert to frequency domain, but doesn't always find all errors
         """
         # NOTE: we choose BMA
-        S: np.ndarray = np.ndarray((2*t, ), dtype=galois.Poly)
-        for j in range(2*t):
-            S[j] = r(a**(m0+j))
+        S = galois.Poly(r(a**np.array([m0+j for j in range(2*t)], dtype=int)), field=GF, order="asc")
 
         L:      np.ndarray = np.zeros((2*t+1, ), dtype=int)
         Lambda: np.ndarray = np.ndarray((2*t+1, ), dtype=galois.Poly)
@@ -646,10 +644,11 @@ class QR_code:
         Lambda[0] = galois.Poly([1], field=GF)
         for i in range(1, 2*t + 1):
             delta = GF(0)
-            coeffs = Lambda[i-1].coefficients(order="asc", size=int(L[i-1])+1)
+            coeffs_Lambda = Lambda[i-1].coefficients(order="asc", size=int(L[i-1])+1)
+            coeffs_Sigma = S.coefficients(order="asc", size=2*t)
 
             for j in range(L[i-1] + 1):
-                delta += coeffs[j] * S[i-1-j]
+                delta += coeffs_Lambda[j] * coeffs_Sigma[i-1-j]
 
             if delta == 0:
                 Lambda[i] = Lambda[i-1]
@@ -664,25 +663,14 @@ class QR_code:
             B *= z
             if t < Lambda[i].degree:
                 raise Exception("Decoding impossible")
-        Lambda = Lambda[2*t]
+        Lambda: galois.Poly = Lambda[2*t]
 
-        # NOTE: find error vector (in frequency domain)
-        v: int = Lambda.degree
-        E: np.ndarray = np.array([GF(0) for _ in range(n)], dtype=galois.Poly)
-        coeffs = Lambda.coefficients(order="asc")
-        for j in range(m0, m0+n):
-            if m0 <= j and j < m0+2*t:
-                E[j] = S[j-m0]
-            else:
-                for i in range(1, v+1):
-                    E[j % n] += -coeffs[i] * E[(j-i) % n]
-
-        # NOTE: convert error vector to time domain
+        # NOTE: find errors user Forney's algorithm
+        Sigma: galois.Poly = (S * Lambda) % z**(2*t)
+        dLambda: galois.Poly = Lambda.derivative()
         e: np.ndarray = np.array([GF(0) for _ in range(n)], dtype=galois.Poly)
-        for i in range(n):
-            for j in range(n):
-                e[i] += (a**(-i*j)) * E[j]
-            e[i] //= GF(n % p)
+        for li in (GF(Lambda.roots())**(-1)).log():
+            e[li] = -a**(li*(1-m0)) * Sigma(a**(-li))/dLambda(a**(-li))
 
         decoded: galois.FieldArray = (r - galois.Poly(e, field=GF, order="asc")).coeffs
         ################################################################################################################
