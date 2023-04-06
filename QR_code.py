@@ -80,16 +80,23 @@ class QR_code:
             # of GF(256)
             informationword = []
             for p in range(border//nr_blocks//8):
-                number = block[8*p]*2**7+block[8*p+1]*2**6+block[8*p+2]*2**5+block[8*p+3]*2**4+block[8*p+4]*2**3+block[8*p+5]*2**2+block[8*p+6]*2+block[8*p+7]
+                number = block[8*p]*2**7 + block[8*p+1]*2**6 + block[8*p+2]*2**5 + block[8*p+3]*2**4 + block[8*p+4]*2**3 + block[8*p+5]*2**2 + block[8*p+6]*2 + block[8*p+7]
                 informationword.append(number)
             informationword = GF(informationword)
-            encoded_data.append(self.encodeRS(informationword, 2, 8, 172//nr_blocks, border//nr_blocks//8, self.generator))
+            codeword = self.encodeRS(informationword, 2, 8, 172//nr_blocks, border//nr_blocks//8, self.generator)
+            # decodeword = self.decodeRS(codeword, 2, 8, 172//nr_blocks, border//nr_blocks//8, self.generator)
+            # print(f"b = [{', '.join([f'{i:>3}' for i in informationword])}]\n"
+            #       f"c = [{', '.join([f'{i:>3}' for i in codeword])}]\n"
+            #       f"d = [{', '.join([f'{i:>3}' for i in decodeword])}]\n")
+            encoded_data.append(codeword)
         # interlace the elements of GF(256) and convert the elements to their bit representation -> message
+
         numbers = []
         for k in range(172//nr_blocks):
             for l in range(nr_blocks):
                 num = encoded_data[l][k]
                 numbers.append(num)
+        # print(f"[{' '.join([f'{i:>3}' for i in numbers])}]")
         data_enc = []
         for j in numbers:
             number = '{0:08b}'.format(j)
@@ -113,7 +120,61 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        bitstream: np.ndarray = ...
+        match self.level:
+            case 'L':
+                nr_blocks = 2
+                p, m, n, k = 2, 8, 172//nr_blocks, 68
+            case 'M':
+                nr_blocks = 4
+                p, m, n, k = 2, 8, 172//nr_blocks, 27
+            case 'Q':
+                nr_blocks = 4
+                p, m, n, k = 2, 8, 172//nr_blocks, 19
+            case 'H':
+                nr_blocks = 4
+                p, m, n, k = 2, 8, 172//nr_blocks, 15
+
+        pad_length: int = 7
+        prim_poly:  galois.Poly = galois.primitive_poly(p, m)
+        GF:         Type[galois.FieldArray] = galois.GF(p**m, irreducible_poly=prim_poly)
+
+        # NOTE: convert to elements of GF
+        data: np.ndarray = data_enc.reshape(-1, 8).transpose()
+        data <<= np.repeat(np.array([7, 6, 5, 4, 3, 2, 1, 0]).reshape(8, 1), 172, axis=1)
+        data = np.sum(data, axis=0)
+
+        # NOTE: decode
+        codewords: np.ndarray = data.reshape(-1, nr_blocks).transpose()
+        decodewords: np.ndarray = np.array([], dtype=int)
+        for i in range(nr_blocks):
+            codeword = GF(codewords[i])
+            information_word = np.array(QR_code.decodeRS(codeword, p, m, n, k, self.generator), dtype=int)
+            decodewords = np.append(decodewords, information_word)
+
+            # print(f"r = [{', '.join([f'{j:>3}' for j in codeword])}]\n"
+            #       f"b = [{', '.join([f'{j:>3}' for j in information_word])}]\n")
+        decodewords = decodewords.flatten()
+        print(f"dw = [{', '.join([f'{j:>3}' for j in decodewords])}]\n")
+
+        # NOTE: convert back to bitstream
+        bitstream = np.repeat(decodewords.reshape(-1, 1), 8, axis=1)
+        bitstream >>= np.repeat(np.array([7, 6, 5, 4, 3, 2, 1, 0]).reshape(1, 8), len(bitstream), axis=0)
+        bitstream &= 1
+        bitstream = bitstream.flatten()
+
+        # NOTE: remove padding
+        character_count_bits = bitstream[4:13]
+        character_count = 0
+        for i in range(9):
+            character_count |= character_count_bits[8-i] << i
+
+        print(character_count)
+        bitstream = bitstream[:4 + 9 + 11*(character_count//2) + 6*(character_count % 2)]
+
+        # for _ in range(4):
+        #     if not bitstream[-1]:
+        #         bitstream = bitstream[:-1]
+
         ################################################################################################################
 
         assert len(np.shape(bitstream)) == 1 and type(bitstream) is np.ndarray, "bitstream must be a 1D numpy array"
@@ -426,42 +487,28 @@ class QR_code:
         # get character count indicator from the header
         character_count_bits = bitstream[4:13]
         character_count = 0
-        for i in range(0, 9):
-            character_count += character_count_bits[8-i]*2**i
+        for i in range(9):
+            character_count |= character_count_bits[8-i] << i
         # we now know how many characters are encoded in the bitstream
 
         # convert the bitstream to the grouped numbers
         binary_data = bitstream[13:]
-        grouped_numbers = []
-        i = 0
-        while i < len(binary_data):
-            if (i+11 < len(binary_data)):
-                number = 0
-                for j in range(0, 11):
-                    number += binary_data[i+10-j] * 2**j
-                grouped_numbers.append(number)
-            else:
-                number = 0
-                for j in range(0, 6):
-                    number += binary_data[i+5-j] * 2**j
-                grouped_numbers.append(number)
-            i += 11
-        # the grouped number is a combination of two numbers like number1*45+number2
-        # extract these numbers back
-        split_numbers = []
-        for i in range(len(grouped_numbers)):
-            if (i == len(grouped_numbers)-1 and character_count % 2 == 1):
-                split_numbers.append(grouped_numbers[i])
-            else:
-                split_numbers.append(grouped_numbers[i]//45)
-                split_numbers.append(grouped_numbers[i] % 45)
+        chars = []
+        for i in range(0, len(binary_data), 11):
+            number = 0
+            for j in range(11):
+                number |= binary_data[i+10-j] << j
+            chars.append(number // 45)
+            chars.append(number % 45)
 
-        # now only conversion from numbers to strings is necessary
-        convert_array = np.array(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', '$', '%', '*', '+', '-', '.', '/', ':'])
+        if character_count % 2 == 1 and i < len(binary_data)-6:
+            for j in range(6):
+                number |= binary_data[i+5-j] << j
+            chars.append(number)
 
         string_data = ""
-        for i in split_numbers:
-            string_data += convert_array[i]
+        for c in chars:
+            string_data += "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"[c]
 
         data: str = string_data
         ################################################################################################################
@@ -591,12 +638,8 @@ class QR_code:
         # -> they disappear from the codeword and codeword hasn't right length -> add them at the front
         to_add = n-len(codeword)
         if (to_add != 0):
-            print([int(0) for i in range(to_add)])
             codeword = np.append([int(0) for i in range(to_add)], codeword)
         GF.repr("int")
-        print(codeword)
-
-        codeword: galois.FieldArray = codeword
         ################################################################################################################
 
         assert type(codeword) is GF and len(np.shape(codeword)) == 1, "each element of codeword(1D)  must be a galois.GF element"
@@ -621,7 +664,7 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        n = p**m - 1
+        generator = galois.Poly(generator.coeffs, field=GF)
         a:  galois.Poly = GF.primitive_element
         t:  int = generator.degree//2
         r:  galois.Poly = galois.Poly(codeword, field=GF)
@@ -631,7 +674,7 @@ class QR_code:
             Peterson-Gorenstein-Zierler (PGZ)   : good for small t, but here t can be up to 14 => slow
             Euclidean algorithm                 : better than PGZ for larger t, but still complexity non-negligible
             Berlekamp-Massey algorithm (BMA)    : algorithm with lowest computational complexity
-            Forney's algorithm                  : no need to convert to frequency domain, but doesn't always find all errors
+            Forney's algorithm                  : used to determine the correct values when the positions are given
         """
         # NOTE: we choose BMA
         S = galois.Poly(r(a**np.array([m0+j for j in range(2*t)], dtype=int)), field=GF, order="asc")
@@ -668,11 +711,11 @@ class QR_code:
         # NOTE: find errors user Forney's algorithm
         Sigma: galois.Poly = (S * Lambda) % z**(2*t)
         dLambda: galois.Poly = Lambda.derivative()
-        e: np.ndarray = np.array([GF(0) for _ in range(n)], dtype=galois.Poly)
+        e: np.ndarray = np.array([GF(0) for _ in range(p**m - 1)], dtype=galois.Poly)
         for li in (GF(Lambda.roots())**(-1)).log():
             e[li] = -a**(li*(1-m0)) * Sigma(a**(-li))/dLambda(a**(-li))
-
-        decoded: galois.FieldArray = (r - galois.Poly(e, field=GF, order="asc")).coeffs
+        decodeword:      galois.Poly = r - galois.Poly(e, field=GF, order="asc")
+        decoded:         galois.FieldArray = decodeword.coeffs[:k]
         ################################################################################################################
 
         assert type(decoded) is GF and len(np.shape(decoded)) == 1, "each element of decoded(1D)  must be a galois.GF element"
