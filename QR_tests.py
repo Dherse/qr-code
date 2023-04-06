@@ -138,11 +138,11 @@ def test_decodeRS_for_assignment():
 
 
 if __name__ == "__main__":
-    # test_makeGenerator_check_grs()
-    # test_makeGenerator_for_assignment()
-    # test_dataStream()
+    test_makeGenerator_check_grs()
+    test_makeGenerator_for_assignment()
+    test_dataStream()
     test_data()
-    # test_decodeRS_from_example_forney()
-    # test_decodeRS_from_example_bma()
-    # test_decodeRS_from_exercies_11()
-    # test_decodeRS_for_assignment()
+    test_decodeRS_from_example_forney()
+    test_decodeRS_from_example_bma()
+    test_decodeRS_from_exercies_11()
+    test_decodeRS_for_assignment()

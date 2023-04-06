@@ -494,14 +494,17 @@ class QR_code:
         # convert the bitstream to the grouped numbers
         binary_data = bitstream[13:]
         chars = []
-        for i in range(0, len(binary_data), 11):
+        i = 0
+        for c in range(character_count//2):
             number = 0
             for j in range(11):
                 number |= binary_data[i+10-j] << j
+            i += 11
             chars.append(number // 45)
             chars.append(number % 45)
 
-        if character_count % 2 == 1 and i < len(binary_data)-6:
+        if character_count % 2 == 1:
+            number = 0
             for j in range(6):
                 number |= binary_data[i+5-j] << j
             chars.append(number)
