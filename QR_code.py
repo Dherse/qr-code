@@ -531,7 +531,23 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        format: np.ndarray = ...
+        
+        ec_bits = {'L': np.array([0, 1]),'M': np.array([0, 0]),'Q': np.array([1, 1]),'H': np.array([1, 0])}
+        mask_bits = np.array(mask, dtype=int)
+        format_data = np.concatenate((ec_bits[level],mask_bits))
+        generator = np.array([1,0,1,0,0,1,1,0,1,1,1], dtype=int)
+        format_data_extended = np.concatenate((format_data, np.zeros(10, dtype=int)))
+        for i in range(5):
+            if format_data_extended[i] == 1:
+                format_data_extended[i:i+11] = np.logical_xor(format_data_extended[i:i+11], generator)
+
+        bch_code = np.concatenate((format_data, format_data_extended[5:]))
+        
+        xor_mask = np.array([1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0], dtype=int)
+        format = np.logical_xor(bch_code, xor_mask)
+        format = format.astype(int)
+        
+        
         ################################################################################################################
 
         assert len(np.shape(format)) == 1 and type(format) is np.ndarray and format.size == 15, "format must be a 1D numpy array of length 15"
