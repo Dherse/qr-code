@@ -3,6 +3,7 @@ from typing import Type
 
 import galois
 import numpy as np
+import matplotlib.pyplot as plt
 
 from QR_code import QR_code
 
@@ -137,12 +138,59 @@ def test_decodeRS_for_assignment():
     print()
 
 
+def plot_decodeRS_for_assignment():
+    qr: QR_code = QR_code('Q', "optimal")
+    b:  str = "GROUP 21 : 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ +*. -/% $"
+    # b:  str = "GROUP 21"
+    c:  np.ndarray = QR_code.generate_dataStream(b)
+    s:  np.ndarray = qr.encodeData(c)
+
+    N: int = 100
+    P: list[float] = [5e-3, 1e-2, 2e-2, 5e-2, 2e-1, 1e-1]
+    COLORS: list[str] = ["red", "orange", "gold", "lime", "cyan", "blue"]
+    scatter = plt.subplot2grid((5, 3), (0, 0), rowspan=3, colspan=3)
+    for i, (p, color) in enumerate(zip(P, COLORS)):
+        Y: list[float] = []
+        L: int = 0
+        for _ in range(N):
+            try:
+                r:        np.ndarray = qr.decodeData((np.random.random(size=s.shape) < p) ^ s)
+                length_c: int = len(c)
+                length_r: int = len(r)
+                c_r:      int = length_c - length_r
+                if c_r < 0:
+                    t: float = -c_r + np.sum(r[:length_c] ^ c)
+                elif 0 < c_r:
+                    t: float = c_r + np.sum(r ^ c[:length_r])
+                else:
+                    t: float = np.sum(r ^ c)
+                Y.append(t/len(c))
+                L += 1
+            except Exception:
+                pass
+
+        counts, bins = np.histogram(Y, bins=20)
+        hist = plt.subplot2grid((5, 3), (3 + (i // 3), i % 3))
+        hist.hist(bins[:-1], bins, weights=counts, color=color)
+        hist.set_title(rf"$p = {p}$")
+        hist.set_xlim(left=0.0)
+
+        X: list[float] = len(counts)*[i]
+        scatter.scatter(X, [0.5 * (bins[j] + bins[j+1]) for j in range(len(counts))], color=color, s=10*counts)
+
+    # scatter.set_xticklabels(P)
+    scatter.set_ylim(bottom=0.0)
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
-    test_makeGenerator_check_grs()
-    test_makeGenerator_for_assignment()
-    test_dataStream()
-    test_data()
-    test_decodeRS_from_example_forney()
-    test_decodeRS_from_example_bma()
-    test_decodeRS_from_exercies_11()
-    test_decodeRS_for_assignment()
+    # test_makeGenerator_check_grs()
+    # test_makeGenerator_for_assignment()
+    # test_dataStream()
+    # test_data()
+    # test_decodeRS_from_example_forney()
+    # test_decodeRS_from_example_bma()
+    # test_decodeRS_from_exercies_11()
+    # test_decodeRS_for_assignment()
+    plot_decodeRS_for_assignment()

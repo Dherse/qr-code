@@ -154,7 +154,7 @@ class QR_code:
             # print(f"r = [{', '.join([f'{j:>3}' for j in codeword])}]\n"
             #       f"b = [{', '.join([f'{j:>3}' for j in information_word])}]\n")
         decodewords = decodewords.flatten()
-        print(f"dw = [{', '.join([f'{j:>3}' for j in decodewords])}]\n")
+        # print(f"dw = [{', '.join([f'{j:>3}' for j in decodewords])}]\n")
 
         # NOTE: convert back to bitstream
         bitstream = np.repeat(decodewords.reshape(-1, 1), 8, axis=1)
@@ -168,7 +168,7 @@ class QR_code:
         for i in range(9):
             character_count |= character_count_bits[8-i] << i
 
-        print(character_count)
+        # print(character_count)
         bitstream = bitstream[:4 + 9 + 11*(character_count//2) + 6*(character_count % 2)]
 
         # for _ in range(4):
