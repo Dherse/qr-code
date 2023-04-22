@@ -137,17 +137,18 @@ def test_decodeRS_for_assignment():
               f"       (expecting b(x) {'!'*(7<i)}= 0)")
     print()
 
+
 def test_encodeformat():
     # Test case 1 (page 82 of QR_specification)
     level1 = 'M'
-    mask_pattern1 = [1,0,1]
+    mask_pattern1 = [1, 0, 1]
     expected_output1 = np.array([1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0], dtype=int)
     result1 = QR_code.encodeFormat(level1, mask_pattern1)
     assert np.array_equal(result1, expected_output1), f"Test 1 failed: expected {expected_output1}, got {result1}"
-    
+
     # Test case 2 (own calculation)
     level2 = 'Q'
-    mask_pattern2 = [0,1,1]
+    mask_pattern2 = [0, 1, 1]
     expected_output2 = np.array([0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0], dtype=int)
     result2 = QR_code.encodeFormat(level2, mask_pattern2)
     assert np.array_equal(result2, expected_output2), f"Test 2 failed: expected {expected_output2}, got {result2}"
@@ -199,6 +200,15 @@ def plot_decodeRS_for_assignment():
     plt.show()
 
 
+def test_full_qrcode():
+    qr: QR_code = QR_code('Q', "optimal")
+    b:  str = "GROUP 21 : 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ +*. -/% $"
+    code = qr.generate(b)
+    c = QR_code.read(code)
+    print(f" qr code result = {c}\n"
+          f" (expecting {b}")
+
+
 if __name__ == "__main__":
     # test_makeGenerator_check_grs()
     # test_makeGenerator_for_assignment()
@@ -209,4 +219,5 @@ if __name__ == "__main__":
     # test_decodeRS_from_exercies_11()
     # test_decodeRS_for_assignment()
     # test_encodeformat()
-    plot_decodeRS_for_assignment()
+    # plot_decodeRS_for_assignment()
+    test_full_qrcode()
