@@ -4,6 +4,7 @@ from typing import Callable, Literal, Type
 import galois
 import matplotlib.pyplot as plt
 import numpy as np
+from functools import reduce
 
 
 class QR_code:
@@ -566,9 +567,42 @@ class QR_code:
 
         ################################################################################################################
         # insert your code here
-        success: bool = ...
-        level:   Literal['L', 'M', 'Q', 'H'] = ...
-        mask:    tuple[int, int, int] = ...
+        #success: bool = ...
+        #level:   Literal['L', 'M', 'Q', 'H'] = ...
+        #mask:    tuple[int, int, int] = ...
+        
+        bch_mask = np.array([1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0],dtype=int)
+        R = Format ^ bch_mask
+        
+        #calculate the syndrome
+        GF_2_4 = galois.GF(2**4)
+        a = GF_2_4.primitive_element
+        
+        S1 = np.sum(R * a**(np.arange(15) % 15))
+        S3 = np.sum(R * a**(3 * np.arange(15) % 15))
+        S5 = np.sum(R * a**(5 * np.arange(15) % 15))
+        
+        #calculate error locator coeffecients
+        a1 = (S1 * S5 - S3 * S3) * (S1**2)**(-1)
+        a2 = (S3 * S5 - S1 * S3**2) * (S1**2)**(-1)
+        a3 = S1
+
+        # Find the error positions
+        error_positions = [i for i, element in enumerate(a**(-np.arange(15))) if (a1 * element**2 + a2 * element + a3) == 0]
+
+        # Correct the errors
+        corrected_code = R.copy()
+        for pos in error_positions:
+            corrected_code[pos] = 1 - corrected_code[pos]
+        
+        reverse_ec_bits = {(0, 1): 'L', (0, 0): 'M', (1, 1): 'Q', (1, 0): 'H'}
+        level = reverse_ec_bits.get(tuple(corrected_code[:2]))
+        mask = list(corrected_code)[2:5]
+        success = np.array_equal(corrected_code,QR_code.encodeFormat(level, mask))
+        
+        
+        
+        
         ################################################################################################################
 
         assert type(mask) is list and len(mask) == 3, "mask must be a list of length 3"
