@@ -201,12 +201,11 @@ def plot_decodeRS_for_assignment():
 
 
 def test_full_qrcode():
-    qr: QR_code = QR_code('Q', "optimal")
     b:  str = "GROUP 21 : 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ +*. -/% $"
-    code = qr.generate(b)
-    c = QR_code.read(code)
-    print(f" qr code result = {c}\n"
-          f" (expecting {b}")
+    qr: np.ndarray = QR_code('Q', "optimal").generate(b)
+    result: str = QR_code.read(qr)
+    print(f"QR code result = {result}\n"
+          f"    (expecting {b}")
 
 
 if __name__ == "__main__":
