@@ -153,6 +153,18 @@ def test_encodeformat():
     result2 = QR_code.encodeFormat(level2, mask_pattern2)
     assert np.array_equal(result2, expected_output2), f"Test 2 failed: expected {expected_output2}, got {result2}"
 
+def test_decodeFormat():
+    level = ['L', 'M', 'Q', 'H']
+    for l in level:
+        for el1 in range(2):
+            for el2 in range(2):
+                for el3 in range(2):
+                    enc = QR_code.encodeFormat(l,[el1,el2,el3])
+                    dec = QR_code.decodeFormat(enc)
+                    assert dec[0] == True, f"Expected True but got {dec[0]}"
+                    assert dec[1] == l, f"Excpeted {l} but got {dec[1]}"
+                    assert np.array_equal(np.array(dec[2]), np.array([el1,el2,el3])), f"Excpected {[el1,el2,el3]} but got {dec[2]}"
+
 
 def plot_decodeRS_for_assignment():
     p, m, t = 2, 8, 12
@@ -241,14 +253,15 @@ def from_bits(bits: np.ndarray, m: int) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    test_makeGenerator_check_grs()
-    test_makeGenerator_for_assignment()
-    test_dataStream()
-    test_data()
-    test_decodeRS_from_example_bma()
-    test_decodeRS_from_example_forney()
-    test_decodeRS_from_exercies_11()
-    test_decodeRS_for_assignment()
-    test_encodeformat()
-    plot_decodeRS_for_assignment()
-    test_full_qrcode()
+    #test_makeGenerator_check_grs()
+    #test_makeGenerator_for_assignment()
+    #test_dataStream()
+    #test_data()
+    #test_decodeRS_from_example_bma()
+    #test_decodeRS_from_example_forney()
+    #test_decodeRS_from_exercies_11()
+    #test_decodeRS_for_assignment()
+    #test_encodeFormat()
+    test_decodeFormat()
+    #plot_decodeRS_for_assignment()
+    #test_full_qrcode()

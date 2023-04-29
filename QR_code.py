@@ -553,6 +553,8 @@ class QR_code:
 
         assert len(np.shape(format)) == 1 and type(format) is np.ndarray and format.size == 15, "format must be a 1D numpy array of length 15"
         return format
+    
+    
 
     @staticmethod
     def decodeFormat(Format: np.ndarray) -> tuple[bool, Literal['L', 'M', 'Q', 'H'], tuple[int, int, int]]:
@@ -571,34 +573,42 @@ class QR_code:
         #level:   Literal['L', 'M', 'Q', 'H'] = ...
         #mask:    tuple[int, int, int] = ...
         
-        bch_mask = np.array([1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0],dtype=int)
+        #folowing annex C2
+        
+        #release the masking
+        bch_mask = np.array([1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0], dtype=int)
         R = Format ^ bch_mask
         
         #calculate the syndrome
         GF_2_4 = galois.GF(2**4)
         a = GF_2_4.primitive_element
+        syn = galois.Poly(GF_2_4(R))
         
-        S1 = np.sum(R * a**(np.arange(15) % 15))
-        S3 = np.sum(R * a**(3 * np.arange(15) % 15))
-        S5 = np.sum(R * a**(5 * np.arange(15) % 15))
+        #find the syndrome Si
+        S1 = syn(a)
+        S3 = syn(a**3)
+        S5 = syn(a**5)
+        S2 = S1
+        S4 = S2**2
         
-        #calculate error locator coeffecients
-        a1 = (S1 * S5 - S3 * S3) * (S1**2)**(-1)
-        a2 = (S3 * S5 - S1 * S3**2) * (S1**2)**(-1)
-        a3 = S1
-
-        # Find the error positions
-        error_positions = [i for i, element in enumerate(a**(-np.arange(15))) if (a1 * element**2 + a2 * element + a3) == 0]
-
-        # Correct the errors
-        corrected_code = R.copy()
-        for pos in error_positions:
-            corrected_code[pos] = 1 - corrected_code[pos]
+        #find the error position
+        M = GF_2_4([[1,0,0], [S2,S1,1], [S4,S3,S2]])
+        if(np.linalg.det(M)):
+            (s1, s2, s3) = np.linalg.solve(M, GF_2_4([-S1, -S3, -S5]))
+        else:
+            (s1, s2, s3) = (-S1, GF_2_4(0), GF_2_4(0))
+        
+        #error locator poly
+        locpoly = galois.Poly(GF_2_4([1, s1, s2, s3]))
+        
+        #Correct error by reversing bit value
+        for i, el in ((i, GF_2_4.elements[i]) for i in range(1, len(GF_2_4.elements)) if GF_2_4(locpoly(GF_2_4.elements[i])) == 0):
+            R[14 - GF_2_4.elements[1:].log(a)[i - 1]] ^= 1
         
         reverse_ec_bits = {(0, 1): 'L', (0, 0): 'M', (1, 1): 'Q', (1, 0): 'H'}
-        level = reverse_ec_bits.get(tuple(corrected_code[:2]))
-        mask = list(corrected_code)[2:5]
-        success = np.array_equal(corrected_code,QR_code.encodeFormat(level, mask))
+        level = reverse_ec_bits.get(tuple(R[:2]))
+        mask = list(R)[2:5]
+        success = np.array_equal(R^bch_mask,QR_code.encodeFormat(level, mask))
         
         
         
