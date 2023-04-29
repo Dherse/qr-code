@@ -20,7 +20,7 @@ def test_makeGenerator_check_grs():
 
     print(f"QR_Code.makeGenerator(...) check g_rs()\n"
           f"---------------------------------------\n"
-          f">> > coeffs g={g.coeffs}\n"
+          f">>> coeffs g={g.coeffs}\n"
           f"    (expecting coeffs = {GF(a**exp)})\n")
 
 
@@ -155,48 +155,65 @@ def test_encodeformat():
 
 
 def plot_decodeRS_for_assignment():
-    qr: QR_code = QR_code('Q', "optimal")
-    b:  str = "GROUP 21 : 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ +*. -/% $"
-    # b:  str = "GROUP 21"
-    c:  np.ndarray = QR_code.generate_dataStream(b)
-    s:  np.ndarray = qr.encodeData(c)
+    p, m, t = 2, 8, 12
+    prim_poly: galois.Poly = galois.primitive_poly(p, m)
+    GF:        Type[galois.FieldArray] = galois.GF(p**m, irreducible_poly=prim_poly)
+    g:         galois.Poly = QR_code.makeGenerator(p, m, t)
+    n:         int = 172//4
+    k:         int = 19
 
+    print(f"Plot BER curves for assignment\n"
+          f"------------------------------")
+
+    nr_bins: int = 100
     N: int = 100
-    P: list[float] = [5e-3, 1e-2, 2e-2, 5e-2, 2e-1, 1e-1]
+    M: int = 100
+    B: list[galois.FieldArray] = []
+    C: list[galois.FieldArray] = []
+    for _ in range(N):
+        b = np.random.randint(p**m, size=k)
+        B.append(to_bits(b, m))
+        C.append(to_bits(np.array(QR_code.encodeRS(GF(b), p, m, n, k, g), dtype=int), m))
+
+    P: list[float] = [5e-3, 1e-2, 2e-2, 5e-2, 1e-1, 2e-1]
     COLORS: list[str] = ["red", "orange", "gold", "lime", "cyan", "blue"]
-    scatter = plt.subplot2grid((5, 3), (0, 0), rowspan=3, colspan=3)
-    for i, (p, color) in enumerate(zip(P, COLORS)):
-        Y: list[float] = []
-        L: int = 0
-        for _ in range(N):
-            try:
-                r:        np.ndarray = qr.decodeData((np.random.random(size=s.shape) < p) ^ s)
-                length_c: int = len(c)
-                length_r: int = len(r)
-                c_r:      int = length_c - length_r
-                if c_r < 0:
-                    t: float = -c_r + np.sum(r[:length_c] ^ c)
-                elif 0 < c_r:
-                    t: float = c_r + np.sum(r ^ c[:length_r])
-                else:
-                    t: float = np.sum(r ^ c)
-                Y.append(t/len(c))
-                L += 1
-            except Exception:
-                pass
+    Y: list[list[float]] = []
+    for i, (prob, color) in enumerate(zip(P, COLORS)):
+        y: list[float] = []
+        x: int = 0
+        for b, c in zip(B, C):
+            for _ in range(M):
+                try:
+                    e: np.ndarray = (np.random.random(size=c.size) < prob).astype(int)
+                    s: galois.FieldArray = GF(from_bits(e ^ c, m))
+                    r: galois.FieldArray = QR_code.decodeRS(s, p, m, n, k, g)
+                    d: int = np.sum(b ^ to_bits(np.array(r, dtype=int), m))
+                    y.append(d / (m*k))
+                    x += (d == 0)
+                except Exception:
+                    pass
 
-        counts, bins = np.histogram(Y, bins=20)
-        hist = plt.subplot2grid((5, 3), (3 + (i // 3), i % 3))
-        hist.hist(bins[:-1], bins, weights=counts, color=color)
-        hist.set_title(rf"$p = {p}$")
-        hist.set_xlim(left=0.0)
+        counts, bins = np.histogram(y, bins=nr_bins)
+        plt.hist(bins[:-1], bins, weights=counts, color=color)
+        plt.title(f"$p = {prob}$")
+        plt.xlabel("BER")
+        plt.ylabel(f"{len(y)}/{N*M} samples")
+        plt.xlim(left=0.0)
+        plt.savefig(f"../ber_p={prob}_NxM={N}x{M}.png")
+        plt.show()
+        print(f"avg ber({prob=}) = {np.average(y)} ({len(y)}/{N*M} samples, with {x}/{len(y)} correctly decoded)")
+        Y.append(y)
 
-        X: list[float] = len(counts)*[i]
-        scatter.scatter(X, [0.5 * (bins[j] + bins[j+1]) for j in range(len(counts))], color=color, s=10*counts)
+    for i, (prob, y, color) in enumerate(zip(P, Y, COLORS)):
+        counts, bins = np.histogram(y, bins=nr_bins)
+        X: list[float] = nr_bins*[i]
+        plt.scatter(X, [0.5 * (bins[j] + bins[j+1]) for j in range(nr_bins)], color=color, s=1000*counts/(N*M))
 
-    # scatter.set_xticklabels(P)
-    scatter.set_ylim(bottom=0.0)
-    plt.tight_layout()
+    plt.xticks(range(len(P)), P)
+    plt.ylim(bottom=0.0)
+    plt.xlabel("$p$")
+    plt.ylabel("BER")
+    plt.savefig(f"../ber_all_NxM={N}x{M}.png")
     plt.show()
 
 
@@ -208,15 +225,30 @@ def test_full_qrcode():
           f"    (expecting {b}")
 
 
+def to_bits(symbols: np.ndarray, m: int) -> np.ndarray:
+    bits = np.repeat(symbols.reshape(-1, 1), m, axis=1)
+    bits >>= np.repeat(np.array(range(m-1, -1, -1)).reshape(1, m), len(bits), axis=0).astype(int)
+    bits &= 1
+    bits = bits.flatten()
+    return bits
+
+
+def from_bits(bits: np.ndarray, m: int) -> np.ndarray:
+    symbols: np.ndarray = bits.reshape(-1, m).transpose()
+    symbols <<= np.repeat(np.array(range(m-1, -1, -1)).reshape(m, 1), len(bits)//m, axis=1).astype(int)
+    symbols = np.sum(symbols, axis=0)
+    return symbols
+
+
 if __name__ == "__main__":
-    # test_makeGenerator_check_grs()
-    # test_makeGenerator_for_assignment()
-    # test_dataStream()
-    # test_data()
-    # test_decodeRS_from_example_forney()
-    # test_decodeRS_from_example_bma()
-    # test_decodeRS_from_exercies_11()
-    # test_decodeRS_for_assignment()
-    # test_encodeformat()
-    # plot_decodeRS_for_assignment()
+    test_makeGenerator_check_grs()
+    test_makeGenerator_for_assignment()
+    test_dataStream()
+    test_data()
+    test_decodeRS_from_example_bma()
+    test_decodeRS_from_example_forney()
+    test_decodeRS_from_exercies_11()
+    test_decodeRS_for_assignment()
+    test_encodeformat()
+    plot_decodeRS_for_assignment()
     test_full_qrcode()
