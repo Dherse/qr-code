@@ -576,7 +576,7 @@ class QR_code:
         #folowing annex C2
         
         #release the masking
-        bch_mask = np.array([1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0], dtype=int)
+        bch_mask = np.array([1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0], dtype=int) 
         R = Format ^ bch_mask
         
         #calculate the syndrome
@@ -588,8 +588,9 @@ class QR_code:
         S1 = syn(a)
         S3 = syn(a**3)
         S5 = syn(a**5)
-        S2 = S1
+        S2 = S1**2
         S4 = S2**2
+        
         
         #find the error position
         M = GF_2_4([[1,0,0], [S2,S1,1], [S4,S3,S2]])
