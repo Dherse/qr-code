@@ -1,5 +1,5 @@
 
-from typing import Type
+from typing import Type, Literal
 
 import galois
 import numpy as np
@@ -206,6 +206,74 @@ def test_full_qrcode():
     result: str = QR_code.read(qr)
     print(f"QR code result = {result}\n"
           f"    (expecting {b}")
+    
+def generate_damaged_qrcode(level: Literal['L', 'M', 'Q', 'H'], mask: Literal['optimal'] | list[int], size: int, message: str):
+    from PIL import Image, ImageDraw
+    qr: np.ndarray = QR_code(level, mask).generate(message, show=False)
+
+    pixel_size = 20
+    overlay_size = size * pixel_size
+    new_w, new_h = (41 * pixel_size, 41 * pixel_size)
+
+    img = Image.fromarray((qr * 255).astype(np.uint8), 'L')
+    img = img.convert('RGB').resize((new_w, new_h), resample=Image.Resampling.NEAREST)
+
+    drawable = ImageDraw.Draw(img)
+
+    w, h = img.size
+    x, y = (int((w - pixel_size) / 2), int((h - pixel_size) / 2))
+    drawable.rectangle([(x - overlay_size, y - overlay_size), (x + overlay_size, y + overlay_size)], fill="#FFFFFF")
+    with Image.open("ugent-logo.png") as logo:
+        logo = logo.resize((2 * overlay_size + 1, 2 * overlay_size + 1), resample=Image.Resampling.NEAREST)
+
+        img.paste(logo, (x - overlay_size, y - overlay_size))
+
+    img.save("with-logo.png")
+    blk = img.resize((41, 41), resample=Image.Resampling.NEAREST).convert('1')
+
+    data = np.asarray(blk).astype(int)
+    return QR_code.read(data)
+
+
+def test_damaged_qrcode():
+    b:  str = "GROUP 21 : 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ +*. -/% $"
+    generate_damaged_qrcode('Q', 'optimal', 9, b)
+
+def test_damaged_qrcodes():
+    b:  str = "GROUP 21 : 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ +*. -/% $"
+    levels = ['L', 'M', 'Q', 'H']
+    mask_codes: list[list[int]] = [[int(x) for x in np.binary_repr(i, 3)] for i in range(8)]
+
+    for level in levels:
+        for mask in mask_codes:
+            for i in range(1, 20):
+                try:
+                    result = generate_damaged_qrcode(level, mask, i, b)
+                    if result != b:
+                        print("Level: ", level)
+                        print("Mask: ", mask)
+                        print("Found: ", i - 1)
+                        print("---------------------")
+                        break
+                except:
+                    print("Level: ", level)
+                    print("Mask: ", mask)
+                    print("Found: ", i - 1)
+                    print("---------------------")
+                    break
+
+def generate_test_qrcode():
+    from PIL import Image, ImageDraw
+    b:  str = "GROUP 21 : 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ +*. -/% $"
+    qr: np.ndarray = QR_code('Q', 'optimal').generate(b, show=False)
+
+    pixel_size = 20
+    new_w, new_h = (41 * pixel_size, 41 * pixel_size)
+
+    img = Image.fromarray((qr * 255).astype(np.uint8), 'L')
+    img = img.convert('RGB').resize((new_w, new_h), resample=Image.Resampling.NEAREST)
+
+    img.save("reference.png")
 
 
 if __name__ == "__main__":
@@ -219,4 +287,6 @@ if __name__ == "__main__":
     # test_decodeRS_for_assignment()
     # test_encodeformat()
     # plot_decodeRS_for_assignment()
-    test_full_qrcode()
+    generate_test_qrcode()
+    # test_damaged_qrcodes()
+    # test_full_qrcode()
