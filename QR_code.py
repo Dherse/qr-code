@@ -182,7 +182,7 @@ class QR_code:
         return bitstream
 
     # QR-code generator/reader (do not change)
-    def generate(self, data: str) -> np.ndarray:
+    def generate(self, data: str, show: bool = True) -> np.ndarray:
         # This function creates and displays a QR code matrix with either the optimal mask or a specific mask (depending on self.mask)
         # INPUT:
         #  -data: data to be encoded in the QR code. In this project a string with only characters from the alphanumeric mode
@@ -207,7 +207,7 @@ class QR_code:
                     self.mask = mask_code[m]
 
         # create the QR-code using either the selected or the optimal mask
-        QRmatrix: np.ndarray = self.construct(data_bits, self.mask)
+        QRmatrix: np.ndarray = self.construct(data_bits, self.mask, show=show)
 
         return QRmatrix
 
