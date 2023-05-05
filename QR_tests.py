@@ -331,6 +331,6 @@ if __name__ == "__main__":
     # test_decodeRS_for_assignment()
     # test_encodeformat()
     # plot_decodeRS_for_assignment()
-    generate_test_qrcode()
+    # generate_test_qrcode()
     # test_damaged_qrcodes()
-    # test_full_qrcode()
+    test_full_qrcode()

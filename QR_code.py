@@ -383,7 +383,7 @@ class QR_code:
 
         QR_reshape: np.ndarray = np.vstack((np.transpose(col1.flatten(order='F')), np.transpose(col2.flatten(order='F'))))
 
-        data:       np.ndarray = np.zeros((172*8, 1))
+        data:       np.ndarray = np.zeros((172*8, 1), dtype=int)
         ind_col:    int = 0
         ind_row:    int = 0
         ind_data:   int = 0
